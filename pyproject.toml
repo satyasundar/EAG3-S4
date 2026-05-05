@@ -1,0 +1,13 @@
+[project]
+name = "eag3-s4"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastmcp[apps]>=3.2.4",
+    "google-genai>=1.75.0",
+    "httpx>=0.28.1",
+    "prefab-ui>=0.19.1",
+    "python-dotenv>=1.2.2",
+]
