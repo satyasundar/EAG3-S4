@@ -21,6 +21,7 @@ Env:
 
 import asyncio
 import os
+from datetime import datetime
 from concurrent.futures import TimeoutError
 
 from dotenv import load_dotenv
@@ -30,10 +31,14 @@ from mcp.client.stdio import stdio_client
 
 load_dotenv()
 
-MODEL = "gemini-3.1-flash-lite-preview"   # per your instruction; swap if the name differs
+MODEL = (
+    "gemini-3.1-flash-lite-preview"  # per your instruction; swap if the name differs
+)
 MAX_ITERATIONS = 6
 LLM_SLEEP_SECONDS = 5
 LLM_TIMEOUT = 15
+
+today = datetime.utcnow().date().isoformat()
 
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
@@ -54,7 +59,10 @@ def describe_tools(tools) -> str:
     lines = []
     for i, t in enumerate(tools, 1):
         props = (t.inputSchema or {}).get("properties", {})
-        params = ", ".join(f"{n}: {p.get('type', '?')}" for n, p in props.items()) or "no params"
+        params = (
+            ", ".join(f"{n}: {p.get('type', '?')}" for n, p in props.items())
+            or "no params"
+        )
         lines.append(f"{i}. {t.name}({params}) — {t.description or ''}")
     return "\n".join(lines)
 
@@ -65,7 +73,7 @@ def coerce(value: str, schema_type: str):
     if schema_type == "number":
         return float(value)
     if schema_type == "array":
-        return eval(value)       # teaching code; fine inside the sandbox
+        return eval(value)  # teaching code; fine inside the sandbox
     if schema_type == "boolean":
         return value.lower() in ("true", "1", "yes")
     return value
@@ -74,10 +82,10 @@ def coerce(value: str, schema_type: str):
 async def main():
     server_params = StdioServerParameters(
         command="python",
-        #args=["example_mcp_server.py"],
-        args=["expense_mcp_server.py"]
+        # args=["example_mcp_server.py"],
+        args=["expense_mcp_server.py"],
     )
-    breakpoint()
+
     async with stdio_client(server_params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
@@ -87,23 +95,42 @@ async def main():
             tools_desc = describe_tools(tools)
             print(f"Loaded {len(tools)} tools\n")
 
-            system_prompt = f"""You are a file-manipulation agent working inside a sandboxed MCP server.
-You solve tasks by calling tools ONE AT A TIME and observing their results.
+            system_prompt = f"""You are a expense-tracking agent connected to an MCP Server.
+                You solve tasks by calling tools ONE AT A TIME and observing their results.
 
-Available tools:
-{tools_desc}
+                Available tools:
+                {tools_desc}
 
-Respond with EXACTLY ONE line, in one of these two formats:
-  FUNCTION_CALL: tool_name|arg1|arg2|...
-  FINAL_ANSWER: <short natural-language summary of what you did>
+                Respond with EXACTLY ONE line, in one of these two formats:
+                FUNCTION_CALL: tool_name|arg_name=value|arg_name=value|...
+                FINAL_ANSWER: <short natural-language summary of what you did>
 
-Rules:
-- Provide args in the exact order of the tool's parameters.
-- Do not invent tools that are not listed above.
-- After each FUNCTION_CALL you'll receive the result; use it to decide the next step.
-- Prefer the simplest 2–3 tool sequence that solves the task.
-- When the task is complete, emit FINAL_ANSWER.
-"""
+                Rules:
+                - Arguments use key=value sysntax separated by | (pipe).
+                - Only include arguments you want to pass; omit optional ones you don't need.
+                - DO NOT include surrounding quotes around values. Write amount=450, not amount="450"
+                - Values must not contain | or = characters. If a note would contain them, replace with dashes.
+                - For tools with no arguments, just write the tool name: FUNCTION_CALL: fetch_exchange_rates
+                - Provide args in the exact order of the tool's parameters.
+                - For expense_crud, the first arg is always the action: create | read | update | delete
+                - Do not invent tools or arguments that are not listed above.
+                - After each FUNCTION_CALL you'll receive the result; use it to decide the next step.
+                - When the task is complete, emit FINAL_ANSWER.
+
+                Domain rules:
+                - Valid currencies: INR, USD, EUR, GBP, JPY, AUD, CAD, SGD.
+                - Valid categories: Food, Transport, Shopping, Bills, Entertainment, Other.
+                - Map currency symbols: ₹ or "rupees" -> INR, $ -> USD, € -> EUR, ￡ -> GBP, ¥ -> JPY.
+                - Resolve relative dates ("today", "yesterday", "2 days ago") into YYYY-MM-DD before calling.
+                - Today's date is {today}
+
+                Workflow rules:
+                - Add ONE expense for FUNCTION_CALL - never batch multiple expenses into one call.
+                - If the user adds non-INR expenses, call fetch_exchange_rates before showing the dashboard.
+                - When the user asks to "see", "show", "open", or "view" expenses, call show_expense_dashboard, FINAL_ANSWER.
+                - A typical multi-expense request looks like: create, create, create, ..., fetch_exchange_rates, show_expense_dashboard, FINAL_ANSWER.
+                - If a tool result contains "ok": false, read the error and either correct your call or stop with FINAL_ANSWER explaining the failure.
+                """
 
             # task = (
             #     "Create a file called greeting.txt in the sandbox with the content "
@@ -115,7 +142,6 @@ Rules:
                 "(Transport), €60 hotel breakfast 2 days ago (Food), and ₹1200 grocery shopping today (Shopping)."
                 "Then refresh the exchange rates and open my expense dashboard"
             )
-
 
             history: list[str] = []
             for iteration in range(1, MAX_ITERATIONS + 1):
