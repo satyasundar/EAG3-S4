@@ -152,11 +152,22 @@ async def main():
             #     "(Transport), €60 hotel breakfast 2 days ago (Food), and ₹1200 grocery shopping today (Shopping)."
             #     "Then refresh the exchange rates and open my expense dashboard"
             # )
-            task = (
-                "Add €60 hotel breakfast 2 days ago (Food)"
-                "Then refresh the exchange rates and open my expense dashboard"
-            )
+            # task = (
+            #     "Add €60 hotel breakfast 2 days ago (Food)"
+            #     "Then refresh the exchange rates and open my expense dashboard"
+            # )
 
+            print("\n💬 Expense Tracker Agent — type 'quit' to exit")
+            print("Try: 'Add ₹450 lunch today as Food and show my dashboard'\n")
+
+            while True:
+                task = input("\n> ").strip()
+                if task.lower() in ("quit", "exit", "q"):
+                    print("Goodbye!")
+                    break
+                if not task:
+                    continue
+                    
             history: list[str] = []
             for iteration in range(1, MAX_ITERATIONS + 1):
                 print(f"\n--- Iteration {iteration} ---")
