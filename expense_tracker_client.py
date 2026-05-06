@@ -34,7 +34,7 @@ load_dotenv()
 MODEL = (
     "gemini-3.1-flash-lite-preview"  # per your instruction; swap if the name differs
 )
-MAX_ITERATIONS = 6
+MAX_ITERATIONS = 8
 LLM_SLEEP_SECONDS = 5
 LLM_TIMEOUT = 15
 
@@ -111,7 +111,6 @@ async def main():
                 - DO NOT include surrounding quotes around values. Write amount=450, not amount="450"
                 - Values must not contain | or = characters. If a note would contain them, replace with dashes.
                 - For tools with no arguments, just write the tool name: FUNCTION_CALL: fetch_exchange_rates
-                - Provide args in the exact order of the tool's parameters.
                 - For expense_crud, the first arg is always the action: create | read | update | delete
                 - Do not invent tools or arguments that are not listed above.
                 - After each FUNCTION_CALL you'll receive the result; use it to decide the next step.
@@ -127,9 +126,20 @@ async def main():
                 Workflow rules:
                 - Add ONE expense for FUNCTION_CALL - never batch multiple expenses into one call.
                 - If the user adds non-INR expenses, call fetch_exchange_rates before showing the dashboard.
-                - When the user asks to "see", "show", "open", or "view" expenses, call show_expense_dashboard, FINAL_ANSWER.
+                - When the user asks to "see", "show", "open", or "view" expenses, call show_expense_dashboard. After it succeeds, emit FINAL_ANSWER.
                 - A typical multi-expense request looks like: create, create, create, ..., fetch_exchange_rates, show_expense_dashboard, FINAL_ANSWER.
-                - If a tool result contains "ok": false, read the error and either correct your call or stop with FINAL_ANSWER explaining the failure.
+                - If a tool result contains "ok": false, read the error and either correct your call
+                 or stop with FINAL_ANSWER explaining the failure.
+
+                
+                Examples:
+                    FUNCTION_CALL: expense_crud|action=create|amount=450|currency=INR|category=Food|date=2026-05-06|note=lunch
+                    FUNCTION_CALL: expense_crud|action=update|expense_id=a1b2c3d4|category=Transport
+                    FUNCTION_CALL: expense_crud|action=delete|expense_id=a1b2c3d4
+                    FUNCTION_CALL: expense_crud|action=read
+                    FUNCTION_CALL: fetch_exchange_rates
+                    FUNCTION_CALL: show_expense_dashboard
+                    FINAL_ANSWER: Added 4 expenses, refreshed exchange rates, and opened the dashboard.
                 """
 
             # task = (
@@ -137,9 +147,13 @@ async def main():
             #     "'hello rohan'. Then read it back to confirm. Then edit it so "
             #     "'hello' becomes 'hi'. Finally give a FINAL_ANSWER."
             # )
+            # task = (
+            #     "I just got back from a trip. Add these expenses: ₹450 lunch today (Food), $25 taxi yesterday"
+            #     "(Transport), €60 hotel breakfast 2 days ago (Food), and ₹1200 grocery shopping today (Shopping)."
+            #     "Then refresh the exchange rates and open my expense dashboard"
+            # )
             task = (
-                "I just got back from a trip. Add these expenses: ₹450 lunch today (Food), $25 taxi yesterday"
-                "(Transport), €60 hotel breakfast 2 days ago (Food), and ₹1200 grocery shopping today (Shopping)."
+                "Add €60 hotel breakfast 2 days ago (Food)"
                 "Then refresh the exchange rates and open my expense dashboard"
             )
 
@@ -180,7 +194,7 @@ async def main():
                     break
 
                 _, call = text.split(":", 1)
-                parts = [p.strip() for p in call.split("|")]
+                parts = [p.strip() for p in call.split("|") if p.strip()]
                 func_name, raw_args = parts[0], parts[1:]
 
                 tool = next((t for t in tools if t.name == func_name), None)
@@ -191,10 +205,22 @@ async def main():
                     continue
 
                 props = (tool.inputSchema or {}).get("properties", {})
-                arguments = {
-                    name: coerce(val, info.get("type", "string"))
-                    for (name, info), val in zip(props.items(), raw_args)
-                }
+                # arguments = {
+                #     name: coerce(val, info.get("type", "string"))
+                #     for (name, info), val in zip(props.items(), raw_args)
+                # }
+                arguments = {}
+                for kv in raw_args:
+                    if "=" not in kv:
+                        print(f"⚠ Skipping malformed arg {kv!r}")
+                        continue
+                    k, v = kv.split("=", 1)
+                    k, v = k.strip(), v.strip()
+                    if k not in props:
+                        print(f"⚠ Unknown arg {k!r} for {func_name}; passing through anyway")
+                    schema_type = props.get(k, {}).get("type", "string")
+                    arguments[k] = coerce(v, schema_type)
+
 
                 print(f"→ {func_name}({arguments})")
                 try:

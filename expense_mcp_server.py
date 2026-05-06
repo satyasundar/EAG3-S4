@@ -418,26 +418,44 @@ def show_expense_dashboard() -> ToolResult:
             min_amt = Rx("min_amount")
             hide_small = Rx("hide_small")
 
+            # with ForEach("expenses") as exp:
+            #     # Show this card only if it passes ALL active filters.
+            #     # We render every card wrapped in If; non-matching ones collapse.
+            #     category_ok = (cat_filter == "All") | (cat_filter == exp.category)
+            #     amount_ok = exp.amount_inr >= min_amt
+            #     size_ok = hide_small.then(exp.amount_inr >= 100, True)
+
+            #     with If(category_ok & amount_ok & size_ok):
+            #         with Card():
+            #             with CardContent():
+            #                 with Row(gap=4, align="center"):
+            #                     Badge(exp.category, variant="default")
+            #                     with Column(gap=1):
+            #                         Text(
+            #                             exp.amount.currency(exp.currency),
+            #                             css_class="font-semibold text-lg",
+            #                         )
+            #                         Muted(exp.date)
+            #                     Text(exp.note)
+            #                     Muted(f"id: {exp.id}")
             with ForEach("expenses") as exp:
-                # Show this card only if it passes ALL active filters.
-                # We render every card wrapped in If; non-matching ones collapse.
-                category_ok = (cat_filter == "All") | (cat_filter == exp.category)
-                amount_ok = exp.amount_inr >= min_amt
-                size_ok = hide_small.then(exp.amount_inr >= 100, True)
+                category_ok = (cat_filter == "All") | (cat_filter == exp["category"])
+                amount_ok = exp["amount_inr"] >= min_amt
+                size_ok = hide_small.then(exp["amount_inr"] >= 100, True)
 
                 with If(category_ok & amount_ok & size_ok):
                     with Card():
                         with CardContent():
                             with Row(gap=4, align="center"):
-                                Badge(exp.category, variant="default")
+                                Badge(exp["category"], variant="default")
                                 with Column(gap=1):
                                     Text(
-                                        exp.amount.currency(exp.currency),
+                                        exp["amount_inr"],
                                         css_class="font-semibold text-lg",
                                     )
-                                    Muted(exp.date)
-                                Text(exp.note)
-                                Muted(f"id: {exp.id}")
+                                    Muted(exp["date"])
+                                Text(exp["note"])
+                                Muted(exp["id"])
 
     # ---- Tool result ----------------------------------------------------
     summary = (
