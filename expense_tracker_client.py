@@ -167,89 +167,90 @@ async def main():
                     break
                 if not task:
                     continue
-                    
-            history: list[str] = []
-            for iteration in range(1, MAX_ITERATIONS + 1):
-                print(f"\n--- Iteration {iteration} ---")
 
-                context = "\n".join(history) if history else "(no prior steps)"
-                prompt = (
-                    f"{system_prompt}\n"
-                    f"Task: {task}\n\n"
-                    f"Previous steps:\n{context}\n\n"
-                    f"What is your next single action?"
-                )
+                history: list[str] = []
+                for iteration in range(1, MAX_ITERATIONS + 1):
+                    print(f"\n--- Iteration {iteration} ---")
 
-                print(f"Sleeping {LLM_SLEEP_SECONDS}s before LLM call...")
-                await asyncio.sleep(LLM_SLEEP_SECONDS)
-
-                try:
-                    response = await generate_with_timeout(prompt)
-                except (TimeoutError, asyncio.TimeoutError):
-                    print("LLM timed out — stopping.")
-                    break
-                except Exception as e:
-                    print(f"LLM error: {e}")
-                    break
-
-                text = (response.text or "").strip().splitlines()[0].strip()
-                print(f"LLM: {text}")
-
-                if text.startswith("FINAL_ANSWER:"):
-                    print("\n=== Agent done ===")
-                    print(text)
-                    break
-
-                if not text.startswith("FUNCTION_CALL:"):
-                    print("Unexpected response format — stopping.")
-                    break
-
-                _, call = text.split(":", 1)
-                parts = [p.strip() for p in call.split("|") if p.strip()]
-                func_name, raw_args = parts[0], parts[1:]
-
-                tool = next((t for t in tools if t.name == func_name), None)
-                if tool is None:
-                    msg = f"Unknown tool {func_name!r}"
-                    print(msg)
-                    history.append(f"Iteration {iteration}: {msg}")
-                    continue
-
-                props = (tool.inputSchema or {}).get("properties", {})
-                # arguments = {
-                #     name: coerce(val, info.get("type", "string"))
-                #     for (name, info), val in zip(props.items(), raw_args)
-                # }
-                arguments = {}
-                for kv in raw_args:
-                    if "=" not in kv:
-                        print(f"⚠ Skipping malformed arg {kv!r}")
-                        continue
-                    k, v = kv.split("=", 1)
-                    k, v = k.strip(), v.strip()
-                    if k not in props:
-                        print(f"⚠ Unknown arg {k!r} for {func_name}; passing through anyway")
-                    schema_type = props.get(k, {}).get("type", "string")
-                    arguments[k] = coerce(v, schema_type)
-
-
-                print(f"→ {func_name}({arguments})")
-                try:
-                    result = await session.call_tool(func_name, arguments=arguments)
-                    payload = (
-                        result.content[0].text
-                        if result.content and hasattr(result.content[0], "text")
-                        else str(result)
+                    context = "\n".join(history) if history else "(no prior steps)"
+                    prompt = (
+                        f"{system_prompt}\n"
+                        f"Task: {task}\n\n"
+                        f"Previous steps:\n{context}\n\n"
+                        f"What is your next single action?"
                     )
-                except Exception as e:
-                    payload = f"ERROR: {e}"
 
-                print(f"← {payload}")
-                history.append(
-                    f"Iteration {iteration}: called {func_name}({arguments}) → {payload}"
-                )
-            else:
-                print("\nReached MAX_ITERATIONS without FINAL_ANSWER.")
+                    print(f"Sleeping {LLM_SLEEP_SECONDS}s before LLM call...")
+                    await asyncio.sleep(LLM_SLEEP_SECONDS)
+
+                    try:
+                        response = await generate_with_timeout(prompt)
+                    except (TimeoutError, asyncio.TimeoutError):
+                        print("LLM timed out — stopping.")
+                        break
+                    except Exception as e:
+                        print(f"LLM error: {e}")
+                        break
+
+                    text = (response.text or "").strip().splitlines()[0].strip()
+                    print(f"LLM: {text}")
+
+                    if text.startswith("FINAL_ANSWER:"):
+                        print("\n=== Agent done ===")
+                        print(text)
+                        break
+
+                    if not text.startswith("FUNCTION_CALL:"):
+                        print("Unexpected response format — stopping.")
+                        break
+
+                    _, call = text.split(":", 1)
+                    parts = [p.strip() for p in call.split("|") if p.strip()]
+                    func_name, raw_args = parts[0], parts[1:]
+
+                    tool = next((t for t in tools if t.name == func_name), None)
+                    if tool is None:
+                        msg = f"Unknown tool {func_name!r}"
+                        print(msg)
+                        history.append(f"Iteration {iteration}: {msg}")
+                        continue
+
+                    props = (tool.inputSchema or {}).get("properties", {})
+                    # arguments = {
+                    #     name: coerce(val, info.get("type", "string"))
+                    #     for (name, info), val in zip(props.items(), raw_args)
+                    # }
+                    arguments = {}
+                    for kv in raw_args:
+                        if "=" not in kv:
+                            print(f"⚠ Skipping malformed arg {kv!r}")
+                            continue
+                        k, v = kv.split("=", 1)
+                        k, v = k.strip(), v.strip()
+                        if k not in props:
+                            print(
+                                f"⚠ Unknown arg {k!r} for {func_name}; passing through anyway"
+                            )
+                        schema_type = props.get(k, {}).get("type", "string")
+                        arguments[k] = coerce(v, schema_type)
+
+                    print(f"→ {func_name}({arguments})")
+                    try:
+                        result = await session.call_tool(func_name, arguments=arguments)
+                        payload = (
+                            result.content[0].text
+                            if result.content and hasattr(result.content[0], "text")
+                            else str(result)
+                        )
+                    except Exception as e:
+                        payload = f"ERROR: {e}"
+
+                    print(f"← {payload}")
+                    history.append(
+                        f"Iteration {iteration}: called {func_name}({arguments}) → {payload}"
+                    )
+                else:
+                    print("\nReached MAX_ITERATIONS without FINAL_ANSWER.")
 
 
 if __name__ == "__main__":
