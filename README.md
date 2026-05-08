@@ -2,6 +2,8 @@
 
 A project that demonstrates the full **Model Context Protocol (MCP)** stack in Python: a FastMCP server with three tools (internet, local CRUD, Prefab UI dashboard) and a custom agent client built on Gemini that orchestrates the tools through a manual ReAct-style loop.
 
+![dashboard](SCR-20260508-kxct.png)
+
 ---
 
 ## ✨ What this project shows
@@ -47,22 +49,25 @@ The Prefab UI dashboard is rendered via `fastmcp dev apps` — a separate browse
 ## 🛠 The three tools
 
 ### 1. `fetch_exchange_rates()` — Internet
+
 Hits [open.er-api.com](https://open.er-api.com) (free, no API key) to pull live currency rates with INR as the base. Caches the rates into `expenses.json` so the dashboard can convert all amounts to INR.
 
 ### 2. `expense_crud(action, ...)` — Local file CRUD
+
 Standard CRUD on `expenses.json`. Actions: `create`, `read`, `update`, `delete`.
 
-| Action   | Required args                                | Behavior                                  |
-|----------|----------------------------------------------|-------------------------------------------|
-| `create` | `amount`, `currency`, `category`             | Adds an expense with a generated ID       |
-| `read`   | —                                            | Returns the full list                     |
-| `update` | `expense_id`, plus any field to change       | Patches an existing expense               |
-| `delete` | `expense_id`                                 | Removes by ID                             |
+| Action   | Required args                          | Behavior                            |
+| -------- | -------------------------------------- | ----------------------------------- |
+| `create` | `amount`, `currency`, `category`       | Adds an expense with a generated ID |
+| `read`   | —                                      | Returns the full list               |
+| `update` | `expense_id`, plus any field to change | Patches an existing expense         |
+| `delete` | `expense_id`                           | Removes by ID                       |
 
 - **Categories**: `Food`, `Transport`, `Shopping`, `Bills`, `Entertainment`, `Other`
 - **Currencies**: `INR`, `USD`, `EUR`, `GBP`, `JPY`, `AUD`, `CAD`, `SGD`
 
 ### 3. `show_expense_dashboard()` — Prefab UI
+
 Returns a `PrefabApp` with reactive client-side state. The dashboard includes:
 
 - **Summary cards** — total spent (INR), expense count, biggest category
@@ -77,13 +82,13 @@ Returns a `PrefabApp` with reactive client-side state. The dashboard includes:
 
 ## 📦 Project files
 
-| File | Purpose |
-|------|---------|
-| `expense_mcp_server.py` | FastMCP server with the three tools |
+| File                        | Purpose                                          |
+| --------------------------- | ------------------------------------------------ |
+| `expense_mcp_server.py`     | FastMCP server with the three tools              |
 | `expense_tracker_client.py` | Custom agent client (Gemini + manual ReAct loop) |
-| `expenses.json` | Local CRUD storage. Auto-created if missing. |
-| `requirements.txt` | Dependencies |
-| `.env` | Holds `GEMINI_API_KEY` (you create this) |
+| `expenses.json`             | Local CRUD storage. Auto-created if missing.     |
+| `requirements.txt`          | Dependencies                                     |
+| `.env`                      | Holds `GEMINI_API_KEY` (you create this)         |
 
 ---
 
@@ -143,7 +148,7 @@ This opens a browser-based playground. Click **`show_expense_dashboard`** → **
 
 Paste this into the agent client when prompted:
 
-> *"I just got back from a trip. Add these expenses: ₹450 lunch today (Food), $25 taxi yesterday (Transport), €60 hotel breakfast 2 days ago (Food), and ₹1200 grocery shopping today (Shopping). Then refresh the exchange rates and open my expense dashboard."*
+> _"I just got back from a trip. Add these expenses: ₹450 lunch today (Food), $25 taxi yesterday (Transport), €60 hotel breakfast 2 days ago (Food), and ₹1200 grocery shopping today (Shopping). Then refresh the exchange rates and open my expense dashboard."_
 
 This forces the agent to use all three tools:
 
@@ -228,14 +233,14 @@ The server auto-creates a fresh empty file on the next call.
 
 ## 🎓 Assignment requirements coverage
 
-| Requirement | Where it lives |
-|-------------|----------------|
-| MCP server with 3 functions | `expense_mcp_server.py` |
-| Internet (fetch data) | `fetch_exchange_rates` |
-| CRUD on local file | `expense_crud` on `expenses.json` |
-| UI built with Prefab | `show_expense_dashboard` (reactive Prefab app) |
-| Single prompt forces all 3 tools | The forcing prompt above |
-| Run UI in a web/desktop app | `fastmcp dev apps` (web) |
+| Requirement                      | Where it lives                                 |
+| -------------------------------- | ---------------------------------------------- |
+| MCP server with 3 functions      | `expense_mcp_server.py`                        |
+| Internet (fetch data)            | `fetch_exchange_rates`                         |
+| CRUD on local file               | `expense_crud` on `expenses.json`              |
+| UI built with Prefab             | `show_expense_dashboard` (reactive Prefab app) |
+| Single prompt forces all 3 tools | The forcing prompt above                       |
+| Run UI in a web/desktop app      | `fastmcp dev apps` (web)                       |
 
 ---
 
